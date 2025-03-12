@@ -5,7 +5,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import * as FaceSdk from "@regulaforensics/facesdk-webclient"; 
+import * as FaceSdk from "@regulaforensics/facesdk-webclient";
 
 dotenv.config();
 
@@ -23,13 +23,12 @@ async function initializeFaceSDK() {
             console.error("License file missing!");
             process.exit(1);
         }
-        
+
         console.log(`✅ License file loaded from: ${licensePath}`);
         const licenseData = fs.readFileSync(licensePath, "utf-8");
-        
-        //  Correct way to assign SDK
-        faceSdk = FaceSdk; 
-        
+
+        faceSdk = FaceSdk;
+
         console.log("✅ Face SDK initialized successfully.");
     } catch (error) {
         console.error("❌ Error initializing Face SDK:", error);
@@ -39,28 +38,43 @@ async function initializeFaceSDK() {
 
 initializeFaceSDK();
 
-// Face Recognition Route
-router.post("/recognize", upload.single("image"), async (req, res) => {
+// Face Matching Route
+router.post("/match", upload.fields([{ name: "selfie" }, { name: "idPhoto" }]), async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: "No image uploaded!" });
+        if (!req.files || !req.files["selfie"] || !req.files["idPhoto"]) {
+            return res.status(400).json({ error: "Both selfie and ID photo are required!" });
         }
-        
+
         if (!faceSdk) {
             return res.status(500).json({ error: "Face SDK is not initialized yet!" });
         }
+
+        const selfiePath = req.files["selfie"][0].path;
+        const idPhotoPath = req.files["idPhoto"][0].path;
+
+        console.log("📷 Received images:", selfiePath, idPhotoPath);
+
+        const selfieBuffer = fs.readFileSync(selfiePath);
+        const idPhotoBuffer = fs.readFileSync(idPhotoPath);
+
+        const selfieBase64 = selfieBuffer.toString("base64");
+        const idPhotoBase64 = idPhotoBuffer.toString("base64");
         
-        console.log("📷 Received image:", req.file.path);
-        const imageBuffer = fs.readFileSync(req.file.path);
-        const imageBase64 = imageBuffer.toString("base64");
+        // Perform face matching
+        const response = await faceSdk.matchFaces({
+            images: [
+                { image: selfieBase64, type: 1 }, // Type 1: Selfie
+                { image: idPhotoBase64, type: 3 }  // Type 3: Document photo
+            ]
+        });
         
-        // Perform face detection
-        const response = await faceSdk.detectFaces({ image: imageBase64 });
+        const similarity = response.similarity;
+        const isMatch = similarity >= 85;
         
         return res.json({
-            message: response.faces.length > 0 ? "✅ Face detected!" : "❌ No face detected.",
-            faces: response.faces,
-            status: response.faces.length > 0 ? "success" : "failed",
+            message: isMatch ? "Face Match Successful!" : "Faces do not match.",
+            similarity,
+            status: isMatch ? "success" : "failed"
         });
     } catch (error) {
         console.error("Error:", error);
