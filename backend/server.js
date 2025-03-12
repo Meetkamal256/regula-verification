@@ -1,9 +1,10 @@
-const express = require("express");
-const cors = require("cors");
-const fs = require("fs");
-require("dotenv").config();
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import fs from "fs";
+import faceRoutes from "./routes/faceRoutes.js";
 
-const faceRoutes = require("./routes/faceRoutes"); 
+dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

@@ -1,54 +1,62 @@
-import React, { useEffect } from "react";
+import React, { useState } from "react";
 import "./verification.css";
 
 const Verification = () => {
-  useEffect(() => {
-    // Initialize Liveness SDK
-    window.RegulaLiveness.init({
-      license: "/regula.license",
-      onReady: () => console.log("Liveness SDK ready"),
-      onError: (error) => console.error("Liveness SDK error:", error),
-    });
-    
-    // Initialize Document Verification SDK
-    window.RegulaDocument.init({
-      license: "/regula.license",
-      onReady: () => console.log("Document SDK ready"),
-      onError: (error) => console.error("Document SDK error:", error),
-    });
-  }, []);
-  
-  const handleLivenessCheck = async () => {
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState("");
+
+  // Handle file selection
+  const handleFileChange = (event) => {
+    setSelectedFile(event.target.files[0]);
+  };
+
+  // Handle form submission
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!selectedFile) {
+      alert("Please select an image first.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("image", selectedFile);
+
+    setLoading(true);
+    setResult("");
+
     try {
-      const result = await window.RegulaLiveness.start();
-      console.log("Liveness result:", result);
-      alert("Liveness Check Success!");
+      const response = await fetch("http://localhost:5000/api/face/recognize", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! Status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      setResult(data.message || "Verification failed!");
     } catch (error) {
-      console.error("Liveness Check Error:", error);
-      alert("Liveness Check Failed!");
+      console.error("Error verifying image:", error);
+      setResult("Error processing request. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
-  
-  const handleDocumentVerification = async () => {
-    try {
-      const result = await window.RegulaDocument.start();
-      console.log("Document Verification result:", result);
-      alert("Document Verification Success!");
-    } catch (error) {
-      console.error("Document Verification Error:", error);
-      alert("Document Verification Failed!");
-    }
-  };
-  
+
   return (
     <div className="container">
       <h1>Regula Verification</h1>
-      <button className="button" onClick={handleLivenessCheck}>
-        Start Liveness Check
-      </button>
-      <button className="button" onClick={handleDocumentVerification}>
-        Start Document Verification
-      </button>
+      <form onSubmit={handleSubmit}>
+        <input type="file" accept="image/*" onChange={handleFileChange} />
+        <button type="submit" className="button" disabled={loading}>
+          {loading ? "Verifying..." : "Upload & Verify"}
+        </button>
+      </form>
+      {result && <p>{result}</p>}
     </div>
   );
 };
